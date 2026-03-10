@@ -1,0 +1,116 @@
+name: Matt - Auto Label
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited, ready_for_review]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Label issue
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { issue, repository } = context.payload;
+            const text = `${issue.title} ${issue.body || ''}`.toLowerCase();
+            const existing = issue.labels.map(l => l.name);
+            const toAdd = [];
+
+            const rules = [
+              { label: 'new-agent',        patterns: ['new agent', 'agent type', 'agent pattern', 'new pattern'] },
+              { label: 'lib-change',        patterns: ['agent-bus', 'agent-registry', 'correlation', 'lib/', 'shared module'] },
+              { label: 'agent-maintainer',  patterns: ['existing agent', 'agent definition', 'update agent', 'fix agent'] },
+              { label: 'discussion',        patterns: ['breaking change', 'refactor', 'redesign', 'rework', 'overhaul', 'major change'] },
+              { label: 'question',          patterns: ['how do i', 'how to', 'where is', 'what is', 'why does', 'can i', '?'] },
+              { label: 'documentation',     patterns: ['docs', 'readme', 'contributing', 'typo', 'spelling', 'docs/', 'documentation'] },
+              { label: 'risk-scanner',      patterns: ['risk scanner', 'risk-scanner', 'scanner rule', 'risk profile'] },
+              { label: 'templates',         patterns: ['template', 'starter config', 'templates/'] },
+              { label: 'examples',          patterns: ['example', 'reference architecture', 'examples/'] },
+              { label: 'bug',               patterns: ['bug', 'broken', 'not working', 'error', 'fix', 'incorrect', 'wrong'] },
+            ];
+
+            for (const rule of rules) {
+              if (!existing.includes(rule.label) && rule.patterns.some(p => text.includes(p))) {
+                toAdd.push(rule.label);
+              }
+            }
+
+            if (toAdd.length > 0) {
+              // Ensure labels exist before applying
+              const existingLabels = await github.rest.issues.listLabelsForRepo({
+                owner: repository.owner.login,
+                repo: repository.name,
+              });
+              const knownLabels = existingLabels.data.map(l => l.name);
+              const safe = toAdd.filter(l => knownLabels.includes(l));
+
+              if (safe.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  issue_number: issue.number,
+                  labels: safe,
+                });
+              }
+            }
+
+      - name: Label PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { pull_request, repository } = context.payload;
+            const text = `${pull_request.title} ${pull_request.body || ''}`.toLowerCase();
+            const existing = pull_request.labels.map(l => l.name);
+            const toAdd = [];
+
+            // Path-based labels from changed files
+            const files = await github.rest.pulls.listFiles({
+              owner: repository.owner.login,
+              repo: repository.name,
+              pull_number: pull_request.number,
+            });
+            const paths = files.data.map(f => f.filename);
+
+            const pathRules = [
+              { label: 'lib-change',    test: p => p.startsWith('lib/') },
+              { label: 'new-agent',     test: p => p.startsWith('agents/') },
+              { label: 'documentation', test: p => p.startsWith('docs/') || p.endsWith('.md') },
+              { label: 'risk-scanner',  test: p => p.startsWith('risk-scanner/') },
+              { label: 'templates',     test: p => p.startsWith('templates/') },
+              { label: 'examples',      test: p => p.startsWith('examples/') },
+            ];
+
+            for (const rule of pathRules) {
+              if (!existing.includes(rule.label) && paths.some(rule.test)) {
+                toAdd.push(rule.label);
+              }
+            }
+
+            if (toAdd.length > 0) {
+              const existingLabels = await github.rest.issues.listLabelsForRepo({
+                owner: repository.owner.login,
+                repo: repository.name,
+              });
+              const knownLabels = existingLabels.data.map(l => l.name);
+              const safe = toAdd.filter(l => knownLabels.includes(l));
+
+              if (safe.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  issue_number: pull_request.number,
+                  labels: safe,
+                });
+              }
+            }

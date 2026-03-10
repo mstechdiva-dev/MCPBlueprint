@@ -1,0 +1,24 @@
+{
+  "agent_type": "direct-api-wrapper",
+  "agent_name": "your-agent-name",
+  "active": true,
+  "api_endpoint": "https://api.yourservice.com/v1",
+  "auth_method": "api_key",
+  "auth_config": {
+    "header_name": "X-API-Key",
+    "key_source": "env:YOUR_API_KEY"
+  },
+  "allowed_methods": ["GET"],
+  "timeout_ms": 5000,
+  "retry_limit": 3,
+  "retry_delay_ms": 1000,
+  "allowed_endpoints": [
+    "/data/fetch",
+    "/status"
+  ],
+  "guardrail_flags": {
+    "alert_on_non_allowlisted_endpoint": true,
+    "alert_on_volume_spike": true,
+    "volume_spike_threshold": 50
+  }
+}

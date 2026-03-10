@@ -1,0 +1,123 @@
+name: Matt - Stale Management
+
+on:
+  schedule:
+    # Runs daily at 08:00 UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Mark and close stale issues
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const now = Date.now();
+
+            const STALE_DAYS_ISSUE = 30;
+            const CLOSE_DAYS_ISSUE = 45;
+            const STALE_DAYS_PR = 14;
+            const CLOSE_DAYS_PR = 21;
+            const STALE_LABEL = 'stale';
+            const EXEMPT_LABELS = ['pinned', 'security', 'in-progress', 'blocked'];
+
+            function daysAgo(dateStr) {
+              return (now - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
+            }
+
+            // Ensure stale label exists
+            try {
+              await github.rest.issues.getLabel({ owner, repo, name: STALE_LABEL });
+            } catch {
+              await github.rest.issues.createLabel({
+                owner, repo,
+                name: STALE_LABEL,
+                color: 'cccccc',
+                description: 'No activity for an extended period',
+              });
+            }
+
+            // --- ISSUES ---
+            const openIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+
+            for (const issue of openIssues) {
+              if (issue.pull_request) continue; // handled separately
+
+              const labels = issue.labels.map(l => l.name);
+              if (EXEMPT_LABELS.some(e => labels.includes(e))) continue;
+
+              const isAlreadyStale = labels.includes(STALE_LABEL);
+              const inactive = daysAgo(issue.updated_at);
+
+              if (isAlreadyStale && inactive >= CLOSE_DAYS_ISSUE) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issue.number,
+                  body: [
+                    `**Matt the Maintainer** - closing this issue due to inactivity (no updates in ${CLOSE_DAYS_ISSUE}+ days).`,
+                    ``,
+                    `If this is still relevant, reopen it with a comment describing current status. If you need help getting unstuck, tag a maintainer.`,
+                  ].join('\n'),
+                });
+                await github.rest.issues.update({ owner, repo, issue_number: issue.number, state: 'closed' });
+
+              } else if (!isAlreadyStale && inactive >= STALE_DAYS_ISSUE) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: issue.number, labels: [STALE_LABEL] });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: issue.number,
+                  body: [
+                    `**Matt the Maintainer** - this issue has had no activity for ${STALE_DAYS_ISSUE} days.`,
+                    ``,
+                    `If it's still relevant, leave a comment with a status update and I'll remove the stale label. If there's nothing more to do here, it will be closed in ${CLOSE_DAYS_ISSUE - STALE_DAYS_ISSUE} days.`,
+                  ].join('\n'),
+                });
+              }
+            }
+
+            // --- PULL REQUESTS ---
+            const openPRs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+
+            for (const pr of openPRs) {
+              // Fetch full issue data for labels
+              const issueData = await github.rest.issues.get({ owner, repo, issue_number: pr.number });
+              const labels = issueData.data.labels.map(l => l.name);
+              if (EXEMPT_LABELS.some(e => labels.includes(e))) continue;
+
+              const isAlreadyStale = labels.includes(STALE_LABEL);
+              const inactive = daysAgo(pr.updated_at);
+
+              if (isAlreadyStale && inactive >= CLOSE_DAYS_PR) {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: [
+                    `**Matt the Maintainer** - closing this PR due to inactivity (no updates in ${CLOSE_DAYS_PR}+ days).`,
+                    ``,
+                    `If the work is still relevant, reopen the PR with a comment explaining current status. If you need a review, tag a maintainer directly.`,
+                  ].join('\n'),
+                });
+                await github.rest.pulls.update({ owner, repo, pull_number: pr.number, state: 'closed' });
+
+              } else if (!isAlreadyStale && inactive >= STALE_DAYS_PR) {
+                await github.rest.issues.addLabels({ owner, repo, issue_number: pr.number, labels: [STALE_LABEL] });
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: pr.number,
+                  body: [
+                    `**Matt the Maintainer** - this PR has had no activity for ${STALE_DAYS_PR} days.`,
+                    ``,
+                    `Push a commit, leave a comment, or re-request review to keep it active. If no update arrives in ${CLOSE_DAYS_PR - STALE_DAYS_PR} more days, it will be closed automatically.`,
+                  ].join('\n'),
+                });
+              }
+            }

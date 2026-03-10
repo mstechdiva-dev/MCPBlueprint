@@ -1,0 +1,29 @@
+{
+  "agent_type": "event-driven",
+  "agent_name": "your-event-agent-name",
+  "active": true,
+  "event_source": "your-event-stream-endpoint",
+  "max_events_per_minute": 100,
+  "event_filters": ["data.updated", "threshold.exceeded", "status.changed"],
+  "trigger_conditions": [
+    {
+      "event": "threshold.exceeded",
+      "condition": "event.value > 90",
+      "action": "send-alert"
+    },
+    {
+      "event": "data.updated",
+      "condition": "event.source === 'primary'",
+      "action": "refresh-cache"
+    }
+  ],
+  "actions": {
+    "send-alert": { "type": "webhook", "endpoint": "env:ALERT_WEBHOOK_URL" },
+    "refresh-cache": { "type": "internal", "handler": "cache-refresh-handler" }
+  },
+  "guardrail_flags": {
+    "alert_on_rate_exceeded": true,
+    "alert_on_cascading_trigger": true,
+    "log_all_triggered_actions": true
+  }
+}

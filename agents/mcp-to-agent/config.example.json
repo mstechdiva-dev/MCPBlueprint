@@ -1,0 +1,27 @@
+{
+  "agent_type": "mcp-to-agent",
+  "agent_name": "your-mcp-to-agent-name",
+  "active": true,
+  "trigger_tool": "your-trigger-tool-name",
+  "fallback_agent": "default-handler",
+  "routing_rules": [
+    {
+      "condition": "output.type === 'alert'",
+      "route_to": "alert-handler-agent"
+    },
+    {
+      "condition": "output.type === 'report'",
+      "route_to": "report-generator-agent"
+    }
+  ],
+  "sub_agents": [
+    "alert-handler-agent",
+    "report-generator-agent",
+    "default-handler"
+  ],
+  "guardrail_flags": {
+    "alert_on_unregistered_agent_handoff": true,
+    "log_all_handoff_payloads": true,
+    "alert_on_trigger_frequency_spike": true
+  }
+}

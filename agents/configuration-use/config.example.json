@@ -1,0 +1,23 @@
+{
+  "agent_type": "configuration-use",
+  "agent_name": "your-config-agent-name",
+  "active": true,
+  "audit_log": true,
+  "context_signals": ["user.role", "data.category", "system.load"],
+  "adjustment_scope": ["timeout_ms", "retry_limit", "rate_limit"],
+  "config_rules": [
+    {
+      "condition": "system.load > 80",
+      "adjustments": { "rate_limit": 25, "timeout_ms": 3000 }
+    },
+    {
+      "condition": "user.role === 'admin'",
+      "adjustments": { "retry_limit": 5, "timeout_ms": 10000 }
+    }
+  ],
+  "guardrail_flags": {
+    "alert_on_out_of_scope_adjustment": true,
+    "alert_on_rapid_reconfiguration": true,
+    "rapid_reconfig_threshold_per_minute": 10
+  }
+}

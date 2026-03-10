@@ -1,0 +1,21 @@
+{
+  "agent_type": "local-resource-access",
+  "agent_name": "your-local-access-agent-name",
+  "active": true,
+  "access_mode": "read",
+  "require_audit_log": true,
+  "allowed_paths": [
+    "/data/your-project/inputs",
+    "/data/your-project/configs"
+  ],
+  "excluded_paths": [
+    "/data/your-project/configs/secrets",
+    "/data/your-project/configs/.env"
+  ],
+  "guardrail_flags": {
+    "alert_on_out_of_scope_access": true,
+    "alert_on_write_attempt_when_read_only": true,
+    "alert_on_credential_file_access": true,
+    "credential_file_patterns": [".env", "*.key", "*.pem", "secrets.*"]
+  }
+}

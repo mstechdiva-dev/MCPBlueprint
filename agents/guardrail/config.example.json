@@ -1,0 +1,32 @@
+{
+  "agent_type": "guardrail",
+  "agent_name": "guardrail",
+  "active": true,
+  "mode": "alert",
+  "risk_profile_path": "risk-scanner/output/risk-profile.json",
+  "alert_destination": {
+    "type": "webhook",
+    "endpoint": "env:GUARDRAIL_ALERT_WEBHOOK",
+    "fallback": "admin-panel"
+  },
+  "escalation_threshold": {
+    "count": 5,
+    "window_minutes": 10,
+    "escalation_action": "notify-admin"
+  },
+  "intervention_actions": {
+    "pause_agent": true,
+    "block_call": true,
+    "reroute_to": null
+  },
+  "baseline_rules": {
+    "log_agent_handoffs": true,
+    "alert_on_silent_failures": true,
+    "alert_on_repeated_failed_calls": true,
+    "repeated_call_threshold": 3,
+    "alert_on_scope_violation": true,
+    "block_credential_exposure": true,
+    "alert_on_unexpected_activation": true
+  },
+  "platform_rules": []
+}

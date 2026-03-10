@@ -1,0 +1,30 @@
+{
+  "agent_type": "analytics-data-access",
+  "agent_name": "your-analytics-agent-name",
+  "active": true,
+  "cache_ttl_seconds": 300,
+  "time_range": "30d",
+  "data_sources": [
+    {
+      "name": "primary-metrics-store",
+      "endpoint": "env:METRICS_ENDPOINT",
+      "auth_method": "bearer_token",
+      "auth_config": { "token_source": "env:METRICS_TOKEN" }
+    }
+  ],
+  "metrics": [
+    "request_volume",
+    "error_rate",
+    "response_time_p95",
+    "active_users"
+  ],
+  "aggregation": {
+    "default": "average",
+    "request_volume": "sum"
+  },
+  "guardrail_flags": {
+    "alert_on_unauthorized_metric_query": true,
+    "alert_on_large_dataset_return": true,
+    "large_dataset_row_threshold": 10000
+  }
+}

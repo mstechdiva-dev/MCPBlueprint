@@ -1,0 +1,151 @@
+name: Matt - PR Checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, ready_for_review]
+
+jobs:
+  check-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Run PR structural checks
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { pull_request, repository } = context.payload;
+            const pr = pull_request;
+            const issues = [];
+            const warnings = [];
+
+            // 1. Title format: should describe what changed, not be vague
+            const vagueTitle = /^(fix|update|change|misc|stuff|wip|test|tweaks?|cleanup|patch)\.?$/i;
+            if (vagueTitle.test(pr.title.trim())) {
+              issues.push(`**Title is too vague** (\`${pr.title}\`). Use a descriptive title that says what changed - e.g., \`Add streaming agent pattern definition\` or \`Fix guardrail config example for vault auth\`.`);
+            }
+
+            // 2. Title shouldn't start with lowercase
+            if (/^[a-z]/.test(pr.title)) {
+              warnings.push(`**Title starts with lowercase.** Convention is sentence case - e.g., \`Fix broken link in risk-scanner docs\`.`);
+            }
+
+            // 3. Body shouldn't be empty
+            if (!pr.body || pr.body.trim().length < 20) {
+              issues.push(`**PR description is missing or too short.** Add a description explaining what changed and why. If this closes an issue, add \`Closes #N\`.`);
+            }
+
+            // 4. Check for linked issue if this isn't a docs-only PR
+            const files = await github.rest.pulls.listFiles({
+              owner: repository.owner.login,
+              repo: repository.name,
+              pull_number: pr.number,
+            });
+            const paths = files.data.map(f => f.filename);
+            const isDocsOnly = paths.every(p => p.endsWith('.md') || p.startsWith('docs/') || p.startsWith('examples/'));
+            const body = pr.body || '';
+            const hasLinkedIssue = /closes?\s+#\d+|fixes?\s+#\d+|resolves?\s+#\d+/i.test(body);
+
+            if (!isDocsOnly && !hasLinkedIssue) {
+              warnings.push(`**No linked issue found.** If this PR addresses an existing issue, add \`Closes #N\` to the description. If there's no issue yet, that's fine for small doc/config fixes.`);
+            }
+
+            // 5. New agent check: must include definition.md, config.example.json, test.md
+            // Only apply to truly new agent directories (not existing ones being modified).
+            const touchedAgentDirs = [...new Set(
+              paths
+                .filter(p => p.startsWith('agents/'))
+                .map(p => p.split('/').slice(0, 2).join('/'))
+            )];
+
+            for (const dir of touchedAgentDirs) {
+              // Check if this directory existed on the base ref - if so, skip (existing agent)
+              let isNewAgent = false;
+              try {
+                await github.rest.repos.getContent({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  path: dir,
+                  ref: pr.base.sha,
+                });
+              } catch {
+                isNewAgent = true; // Directory did not exist on base - this is a new agent
+              }
+
+              if (isNewAgent) {
+                const required = ['definition.md', 'config.example.json', 'test.md'];
+                const present = paths.filter(p => p.startsWith(dir + '/')).map(p => p.replace(dir + '/', ''));
+                const missing = required.filter(r => !present.includes(r));
+                if (missing.length > 0) {
+                  issues.push(`**New agent folder \`${dir}/\` is missing required files:** ${missing.map(f => `\`${f}\``).join(', ')}. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#agent-definition-standards) for what each file must contain.`);
+                }
+              }
+            }
+
+            // 6. Warn if lib/ is touched - high blast radius
+            const touchesLib = paths.some(p => p.startsWith('lib/'));
+            if (touchesLib) {
+              warnings.push(`**This PR modifies \`lib/\`** - changes here affect every agent in the system. Make sure a maintainer has signed off on the approach in an issue before this is merged.`);
+            }
+
+            // 7. PR size warning
+            const additions = pr.additions || 0;
+            const deletions = pr.deletions || 0;
+            const totalChanges = additions + deletions;
+            if (totalChanges > 500) {
+              warnings.push(`**Large PR (${totalChanges} line changes).** Consider splitting this into smaller, focused PRs if possible. Large PRs are harder to review and more likely to introduce issues.`);
+            }
+
+            // Post comment if there's anything to say
+            if (issues.length === 0 && warnings.length === 0) {
+              // PR looks clean - no comment needed
+              return;
+            }
+
+            // Check if Matt already has a checks comment open on this PR
+            const comments = await github.rest.issues.listComments({
+              owner: repository.owner.login,
+              repo: repository.name,
+              issue_number: pr.number,
+            });
+            const mattCheckComment = comments.data.find(c =>
+              c.user.login === 'github-actions[bot]' &&
+              c.body.includes('<!-- matt-pr-checks -->')
+            );
+
+            let body_text = `<!-- matt-pr-checks -->\n**Matt the Maintainer - PR Review**\n\n`;
+
+            if (issues.length > 0) {
+              body_text += `### Issues to fix before merge\n\n`;
+              body_text += issues.map(i => `- ${i}`).join('\n\n') + '\n\n';
+            }
+            if (warnings.length > 0) {
+              body_text += `### Heads up\n\n`;
+              body_text += warnings.map(w => `- ${w}`).join('\n\n') + '\n\n';
+            }
+
+            body_text += `---\n*Address the issues above, then re-request review. If something looks wrong, leave a comment and a human maintainer will step in.*`;
+
+            if (mattCheckComment) {
+              await github.rest.issues.updateComment({
+                owner: repository.owner.login,
+                repo: repository.name,
+                comment_id: mattCheckComment.id,
+                body: body_text,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: repository.owner.login,
+                repo: repository.name,
+                issue_number: pr.number,
+                body: body_text,
+              });
+            }
+
+            // Fail the check if there are blocking issues
+            if (issues.length > 0) {
+              core.setFailed(`Matt found ${issues.length} issue(s) that must be fixed before merge.`);
+            }

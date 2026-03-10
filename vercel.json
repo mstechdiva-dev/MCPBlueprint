@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "admin-panel/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "agents/*/agent.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/agents/guardrail",             "dest": "agents/guardrail/agent.js" },
+    { "src": "/agents/direct-api-wrapper",    "dest": "agents/direct-api-wrapper/agent.js" },
+    { "src": "/agents/composite-service",     "dest": "agents/composite-service/agent.js" },
+    { "src": "/agents/mcp-to-agent",          "dest": "agents/mcp-to-agent/agent.js" },
+    { "src": "/agents/event-driven",          "dest": "agents/event-driven/agent.js" },
+    { "src": "/agents/configuration-use",     "dest": "agents/configuration-use/agent.js" },
+    { "src": "/agents/analytics-data-access", "dest": "agents/analytics-data-access/agent.js" },
+    { "src": "/agents/hierarchical-mcp",      "dest": "agents/hierarchical-mcp/agent.js" },
+    { "src": "/agents/local-resource-access", "dest": "agents/local-resource-access/agent.js" },
+    { "src": "/(.*)",                         "dest": "admin-panel/index.js" }
+  ],
+  "env": {
+    "VERCEL": "1"
+  }
+}

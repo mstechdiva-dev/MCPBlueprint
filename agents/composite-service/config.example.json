@@ -1,0 +1,30 @@
+{
+  "agent_type": "composite-service",
+  "agent_name": "your-composite-agent-name",
+  "active": true,
+  "parallel": true,
+  "partial_success": false,
+  "timeout_ms": 10000,
+  "merge_strategy": "merge",
+  "services": [
+    {
+      "name": "service-one",
+      "endpoint": "https://api.service-one.com/v1/data",
+      "auth_method": "api_key",
+      "auth_config": { "header_name": "X-API-Key", "key_source": "env:SERVICE_ONE_KEY" },
+      "allowed_methods": ["GET"]
+    },
+    {
+      "name": "service-two",
+      "endpoint": "https://api.service-two.com/v2/records",
+      "auth_method": "bearer_token",
+      "auth_config": { "token_source": "env:SERVICE_TWO_TOKEN" },
+      "allowed_methods": ["GET"]
+    }
+  ],
+  "guardrail_flags": {
+    "alert_on_unlisted_service_call": true,
+    "alert_on_consistent_service_failure": true,
+    "failure_threshold": 3
+  }
+}

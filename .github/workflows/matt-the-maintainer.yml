@@ -1,0 +1,242 @@
+name: Matt the Maintainer
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  greet:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Greet new issue
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { issue, repository } = context.payload;
+            const owner = repository.owner.login;
+            const repo = repository.name;
+            const labels = issue.labels.map(l => l.name);
+            const author = issue.user.login;
+
+            // Detect first-time contributor
+            let isFirstTime = false;
+            try {
+              const history = await github.rest.issues.listForRepo({
+                owner, repo,
+                creator: author,
+                state: 'all',
+                per_page: 2,
+              });
+              // If this is the only issue they've ever opened here, it's their first
+              isFirstTime = history.data.filter(i => !i.pull_request).length <= 1;
+            } catch { /* non-fatal */ }
+
+            let intro = isFirstTime
+              ? `👋 Hey @${author} - welcome, and thanks for your first issue here. I'm **Matt the Maintainer**, the bot that keeps things moving in this repo.\n\n`
+              : `👋 Hey @${author} - I'm **Matt the Maintainer**.\n\n`;
+
+            let body;
+
+            if (labels.includes('new-agent')) {
+              body = intro + [
+                `Thanks for proposing a new agent type. Before a maintainer weighs in, make sure your issue covers:`,
+                `- **What pattern this agent follows** - how it behaves structurally`,
+                `- **What problem it solves** - what's impossible or awkward with the existing 9`,
+                `- **Why none of the existing types fit** - briefly rule out the closest alternatives`,
+                ``,
+                `A maintainer will confirm whether this is in scope before you invest time in the full folder. New agent types set a precedent, so we review them carefully.`,
+              ].join('\n');
+
+            } else if (labels.includes('lib-change')) {
+              body = intro + [
+                `Changes to \`lib/\` affect every agent in the system - this is high blast-radius territory.`,
+                ``,
+                `Before any code gets written, please describe:`,
+                `- **What you're changing** and which modules (\`agent-bus\`, \`agent-registry\`, \`correlation\`)`,
+                `- **Why** - what's broken or missing today`,
+                `- **Blast radius** - what breaks or behaves differently if your change ships`,
+                ``,
+                `A maintainer will sign off on the approach here before you open a PR.`,
+              ].join('\n');
+
+            } else if (labels.includes('agent-maintainer')) {
+              body = intro + [
+                `Got it - I'll loop in the right person for this agent type. Sit tight.`,
+                ``,
+                `In the meantime, describe your proposed change in as much detail as you can so the maintainer has context when they arrive.`,
+              ].join('\n');
+
+            } else if (labels.includes('discussion')) {
+              body = intro + [
+                `Large or breaking changes need a discussion before a PR. Maintainers won't review a PR for a breaking change that hasn't been discussed - it's harder to redirect work that's already done.`,
+                ``,
+                `Lay out the full picture here:`,
+                `- What's changing and why`,
+                `- What the impact is on existing users`,
+                `- What alternatives you considered`,
+                ``,
+                `Maintainers will weigh in and give a direction before you write any code.`,
+              ].join('\n');
+
+            } else if (labels.includes('question')) {
+              body = intro + [
+                `Good question. A maintainer will follow up.`,
+                ``,
+                `In the meantime, these might already have your answer:`,
+                `- [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) - how to work with this project`,
+                `- [docs/getting-started.md](../blob/main/docs/getting-started.md) - local setup`,
+                `- [docs/overview.md](../blob/main/docs/overview.md) - what MCPBlueprint is and isn't`,
+              ].join('\n');
+
+            } else if (labels.includes('bug')) {
+              body = intro + [
+                `Thanks for the bug report. To help us reproduce and fix it quickly, please make sure your issue includes:`,
+                `- **What you expected** to happen`,
+                `- **What actually happened** (include any error output)`,
+                `- **Steps to reproduce** - minimal and specific`,
+                `- **Environment** - Node version, OS, any relevant config`,
+                ``,
+                `A maintainer will take a look.`,
+              ].join('\n');
+
+            } else {
+              body = intro + `A maintainer will take a look shortly. If this is time-sensitive, leave a comment with context and tag a maintainer.`;
+            }
+
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: issue.number,
+              body,
+            });
+
+      - name: Greet new PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { pull_request, repository } = context.payload;
+            const owner = repository.owner.login;
+            const repo = repository.name;
+            const author = pull_request.user.login;
+
+            // Detect first-time contributor
+            let isFirstTime = false;
+            try {
+              const prs = await github.rest.pulls.list({
+                owner, repo, state: 'all', per_page: 2,
+              });
+              isFirstTime = prs.data.filter(p => p.user.login === author).length <= 1;
+            } catch { /* non-fatal */ }
+
+            // Detect what changed to give a focused welcome
+            const files = await github.rest.pulls.listFiles({
+              owner, repo, pull_number: pull_request.number,
+            });
+            const paths = files.data.map(f => f.filename);
+
+            const touchesLib = paths.some(p => p.startsWith('lib/'));
+            const touchesAgents = paths.some(p => p.startsWith('agents/'));
+            const isDocsOnly = paths.every(p => p.endsWith('.md') || p.startsWith('docs/') || p.startsWith('examples/'));
+
+            let intro = isFirstTime
+              ? `👋 Hey @${author} - welcome, and thanks for your first PR here. I'm **Matt the Maintainer**.\n\n`
+              : `👋 Hey @${author} - I'm **Matt the Maintainer**.\n\n`;
+
+            let context_note = '';
+            if (touchesLib) {
+              context_note = `\n> **Note:** This PR modifies \`lib/\` - high blast-radius territory. Make sure an issue was opened and a maintainer signed off on the approach before this is merged.\n`;
+            } else if (touchesAgents && !isDocsOnly) {
+              context_note = `\n> This PR touches agent definitions. If you're adding a new agent type, make sure \`definition.md\`, \`config.example.json\`, and \`test.md\` are all present in the folder.\n`;
+            }
+
+            const checklist = [
+              `- [ ] Title describes **what** changed (not why)`,
+              `- [ ] Description explains **why** the change is needed`,
+              isDocsOnly ? null : `- [ ] Linked issue with \`Closes #N\` (if one exists)`,
+              `- [ ] PR is focused - one change, not bundled fixes`,
+            ].filter(Boolean).join('\n');
+
+            const body = [
+              intro + `I'll get a human reviewer assigned shortly.`,
+              context_note,
+              `**Quick checklist before review:**`,
+              checklist,
+              ``,
+              `If I flag anything in the automated checks, fix it and re-request review. If something looks wrong, leave a comment - a human maintainer will step in.`,
+            ].filter(l => l !== null).join('\n');
+
+            await github.rest.issues.createComment({
+              owner, repo,
+              issue_number: pull_request.number,
+              body,
+            });
+
+      - name: Auto-assign reviewers by path
+        if: github.event_name == 'pull_request' && github.event.action == 'opened'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { pull_request, repository } = context.payload;
+            const owner = repository.owner.login;
+            const repo = repository.name;
+
+            // Read CODEOWNERS if it exists and map paths to reviewers
+            // Falls back gracefully if file doesn't exist
+            let codeowners = '';
+            try {
+              const resp = await github.rest.repos.getContent({
+                owner, repo, path: '.github/CODEOWNERS',
+              });
+              codeowners = Buffer.from(resp.data.content, 'base64').toString('utf8');
+            } catch {
+              // No CODEOWNERS file - skip reviewer assignment
+              return;
+            }
+
+            const files = await github.rest.pulls.listFiles({
+              owner, repo, pull_number: pull_request.number,
+            });
+            const paths = files.data.map(f => f.filename);
+
+            // Parse CODEOWNERS into path→reviewers map
+            const rules = codeowners.split('\n')
+              .filter(line => line.trim() && !line.startsWith('#'))
+              .map(line => {
+                const parts = line.trim().split(/\s+/);
+                return { pattern: parts[0], reviewers: parts.slice(1).map(r => r.replace(/^@/, '')) };
+              });
+
+            const reviewerSet = new Set();
+            for (const filePath of paths) {
+              for (const rule of rules) {
+                const pattern = rule.pattern.replace(/\*/g, '.*').replace(/\//g, '\\/');
+                if (new RegExp(pattern).test(filePath)) {
+                  rule.reviewers.forEach(r => {
+                    // Don't request review from the PR author
+                    if (r !== pull_request.user.login) reviewerSet.add(r);
+                  });
+                }
+              }
+            }
+
+            if (reviewerSet.size > 0) {
+              try {
+                await github.rest.pulls.requestReviewers({
+                  owner, repo,
+                  pull_number: pull_request.number,
+                  reviewers: [...reviewerSet],
+                });
+              } catch {
+                // Reviewer assignment can fail if user isn't a collaborator - non-fatal
+              }
+            }

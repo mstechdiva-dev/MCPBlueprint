@@ -1,0 +1,31 @@
+{
+  "agent_type": "hierarchical-mcp",
+  "agent_name": "your-coordinator-agent-name",
+  "active": true,
+  "coordinator_role": "router",
+  "merge_output": true,
+  "domain_agents": [
+    "data-pipeline-agent",
+    "analytics-agent",
+    "notification-agent"
+  ],
+  "routing_logic": [
+    {
+      "task_type": "data-fetch",
+      "route_to": "data-pipeline-agent"
+    },
+    {
+      "task_type": "trend-analysis",
+      "route_to": "analytics-agent"
+    },
+    {
+      "task_type": "alert",
+      "route_to": "notification-agent"
+    }
+  ],
+  "guardrail_flags": {
+    "alert_on_unregistered_agent_routing": true,
+    "alert_on_scope_bypass": true,
+    "log_all_coordination_decisions": true
+  }
+}

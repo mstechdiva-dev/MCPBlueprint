@@ -1,0 +1,27 @@
+{
+  "name": "mcpblueprint",
+  "version": "1.0.0",
+  "description": "MCPBlueprint: A structured agent definition and management framework for MCP-based systems",
+  "main": "admin-panel/index.js",
+  "scripts": {
+    "start": "node admin-panel/index.js",
+    "onboard": "node admin-panel/onboarding.js",
+    "scan": "node risk-scanner/scanner.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^2.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "agents",
+    "blueprint",
+    "guardrail",
+    "risk-scanner"
+  ],
+  "license": "MIT"
+}

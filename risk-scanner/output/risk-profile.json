@@ -1,0 +1,89 @@
+{
+  "scan_date": "2026-03-08T20:58:12.603Z",
+  "target": "/home/user/mytestrepo-01",
+  "risk_level": "high",
+  "findings": [
+    {
+      "category": "data-exposure",
+      "severity": "low",
+      "description": "File write operation without apparent path validation on line 72",
+      "location": "admin-panel/index.js:72",
+      "recommendation": "Ensure write paths are validated against an allowlist before writing.",
+      "guardrail_rule": "alert_on_undeclared_write_path"
+    },
+    {
+      "category": "data-exposure",
+      "severity": "low",
+      "description": "File write operation without apparent path validation on line 233",
+      "location": "admin-panel/index.js:233",
+      "recommendation": "Ensure write paths are validated against an allowlist before writing.",
+      "guardrail_rule": "alert_on_undeclared_write_path"
+    },
+    {
+      "category": "data-exposure",
+      "severity": "low",
+      "description": "File write operation without apparent path validation on line 276",
+      "location": "admin-panel/onboarding.js:276",
+      "recommendation": "Ensure write paths are validated against an allowlist before writing.",
+      "guardrail_rule": "alert_on_undeclared_write_path"
+    },
+    {
+      "category": "auth-patterns",
+      "severity": "medium",
+      "description": "Possible shared credential across contexts on line 65",
+      "location": "risk-scanner/output/risk-profile.json:65",
+      "recommendation": "Each agent or service context should use its own scoped credentials, not a shared token.",
+      "guardrail_rule": "alert_on_unexpected_agent_activation"
+    },
+    {
+      "category": "loop-detection",
+      "severity": "high",
+      "description": "Potentially unbounded while(true) loop on line 73 with no visible exit condition",
+      "location": "risk-scanner/output/risk-profile.json:73",
+      "recommendation": "Add an explicit exit condition, max iteration count, or timeout to prevent runaway execution.",
+      "guardrail_rule": "alert_on_call_volume_spike"
+    },
+    {
+      "category": "data-exposure",
+      "severity": "low",
+      "description": "File write operation without apparent path validation on line 141",
+      "location": "risk-scanner/scanner.js:141",
+      "recommendation": "Ensure write paths are validated against an allowlist before writing.",
+      "guardrail_rule": "alert_on_undeclared_write_path"
+    },
+    {
+      "category": "data-exposure",
+      "severity": "low",
+      "description": "File write operation without apparent path validation on line 431",
+      "location": "risk-scanner/scanner.js:431",
+      "recommendation": "Ensure write paths are validated against an allowlist before writing.",
+      "guardrail_rule": "alert_on_undeclared_write_path"
+    },
+    {
+      "category": "auth-patterns",
+      "severity": "medium",
+      "description": "Possible shared credential across contexts on line 274",
+      "location": "risk-scanner/scanner.js:274",
+      "recommendation": "Each agent or service context should use its own scoped credentials, not a shared token.",
+      "guardrail_rule": "alert_on_unexpected_agent_activation"
+    },
+    {
+      "category": "loop-detection",
+      "severity": "high",
+      "description": "Potentially unbounded while(true) loop on line 296 with no visible exit condition",
+      "location": "risk-scanner/scanner.js:296",
+      "recommendation": "Add an explicit exit condition, max iteration count, or timeout to prevent runaway execution.",
+      "guardrail_rule": "alert_on_call_volume_spike"
+    },
+    {
+      "category": "loop-detection",
+      "severity": "medium",
+      "description": "Polling pattern near line 305 without apparent backoff strategy",
+      "location": "risk-scanner/scanner.js:305",
+      "recommendation": "Add exponential backoff to polling loops to prevent hammering external services.",
+      "guardrail_rule": "alert_on_cascading_trigger"
+    }
+  ],
+  "guardrail_rules_generated": 4,
+  "baseline_rules_applied": 6
+}

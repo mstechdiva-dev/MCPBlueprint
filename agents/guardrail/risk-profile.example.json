@@ -1,0 +1,25 @@
+{
+  "scan_date": "2026-03-07",
+  "target": "./your-project",
+  "risk_level": "medium",
+  "findings": [
+    {
+      "category": "api-scope",
+      "severity": "high",
+      "description": "Agent has write access to an endpoint that only requires read access",
+      "location": "agents/data-agent/config.json",
+      "recommendation": "Restrict API scope to read-only for this agent",
+      "guardrail_rule": "alert_on_write_to_readonly_endpoint"
+    },
+    {
+      "category": "data-exposure",
+      "severity": "medium",
+      "description": "Response payload includes fields that may contain user identifiers",
+      "location": "agents/reporting-agent/handler.js",
+      "recommendation": "Strip PII fields from payload before returning",
+      "guardrail_rule": "alert_on_pii_in_payload"
+    }
+  ],
+  "guardrail_rules_generated": 2,
+  "baseline_rules_applied": 6
+}
