@@ -32,7 +32,7 @@ A tool that analyzes your codebase before deployment to find potential security 
 The output of the risk scanner - a structured report listing every potential issue found in your code, organized by category and severity. This file drives your guardrail's rule set.
 
 ### PII (Personally Identifiable Information)
-Any data that could identify a specific person - names, email addresses, phone numbers, social security numbers, etc. The risk scanner flags PII exposure because leaking it creates legal and privacy risks.
+Any data that could identify a specific person - names, email addresses, phone numbers, national ID numbers, etc. The risk scanner flags PII exposure because leaking it creates legal and privacy risks.
 
 ---
 
