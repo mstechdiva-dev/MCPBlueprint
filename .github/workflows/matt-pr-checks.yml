@@ -19,23 +19,50 @@ jobs:
           script: |
             const { pull_request, repository } = context.payload;
             const pr = pull_request;
-            const issues = [];
+
+            // Skip checks for the repository owner
+            const repoOwner = repository.owner.login;
+            if (pr.user.login === repoOwner) {
+              core.info(`PR authored by repo owner (${repoOwner}) — skipping checks.`);
+              return;
+            }
+
+            const suggestions = [];
             const warnings = [];
 
             // 1. Title format: should describe what changed, not be vague
             const vagueTitle = /^(fix|update|change|misc|stuff|wip|test|tweaks?|cleanup|patch)\.?$/i;
             if (vagueTitle.test(pr.title.trim())) {
-              issues.push(`**Title is too vague** (\`${pr.title}\`). Use a descriptive title that says what changed - e.g., \`Add streaming agent pattern definition\` or \`Fix guardrail config example for vault auth\`.`);
+              suggestions.push(
+                `**Title is too vague**\n` +
+                `  - Your title: \`${pr.title}\`\n` +
+                `  - Try something like: \`Add streaming agent pattern definition\` or \`Fix guardrail config example for vault auth\`\n` +
+                `  - A good title describes *what* changed so reviewers can triage at a glance.`
+              );
             }
 
             // 2. Title shouldn't start with lowercase
             if (/^[a-z]/.test(pr.title)) {
-              warnings.push(`**Title starts with lowercase.** Convention is sentence case - e.g., \`Fix broken link in risk-scanner docs\`.`);
+              const corrected = pr.title.charAt(0).toUpperCase() + pr.title.slice(1);
+              suggestions.push(
+                `**Title starts with lowercase**\n` +
+                `  - Your title: \`${pr.title}\`\n` +
+                `  - Suggested fix: \`${corrected}\`\n` +
+                `  - Convention is sentence case (capitalize the first letter).`
+              );
             }
 
             // 3. Body shouldn't be empty
             if (!pr.body || pr.body.trim().length < 20) {
-              issues.push(`**PR description is missing or too short.** Add a description explaining what changed and why. If this closes an issue, add \`Closes #N\`.`);
+              const bodyPreview = pr.body ? `\`${pr.body.trim().substring(0, 50)}\`` : '*(empty)*';
+              suggestions.push(
+                `**PR description is missing or too short**\n` +
+                `  - Current description: ${bodyPreview}\n` +
+                `  - Add a few sentences explaining what changed and why. Example:\n` +
+                `    > Adds the streaming agent pattern with config examples and tests.\n` +
+                `    > Closes #42\n` +
+                `  - If this closes an issue, include \`Closes #N\` so it auto-links.`
+              );
             }
 
             // 4. Check for linked issue if this isn't a docs-only PR
@@ -50,7 +77,14 @@ jobs:
             const hasLinkedIssue = /closes?\s+#\d+|fixes?\s+#\d+|resolves?\s+#\d+/i.test(body);
 
             if (!isDocsOnly && !hasLinkedIssue) {
-              warnings.push(`**No linked issue found.** If this PR addresses an existing issue, add \`Closes #N\` to the description. If there's no issue yet, that's fine for small doc/config fixes.`);
+              suggestions.push(
+                `**No linked issue found**\n` +
+                `  - This PR changes code files but doesn't reference an issue.\n` +
+                `  - To link one, add this line anywhere in your description:\n` +
+                `    > Closes #123\n` +
+                `  - Replace \`123\` with the issue number. This auto-closes the issue when merged.\n` +
+                `  - No issue yet? That's fine for small fixes — a reviewer can open one if needed.`
+              );
             }
 
             // 5. New agent check: must include definition.md, config.example.json, test.md
@@ -80,15 +114,30 @@ jobs:
                 const present = paths.filter(p => p.startsWith(dir + '/')).map(p => p.replace(dir + '/', ''));
                 const missing = required.filter(r => !present.includes(r));
                 if (missing.length > 0) {
-                  issues.push(`**New agent folder \`${dir}/\` is missing required files:** ${missing.map(f => `\`${f}\``).join(', ')}. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#agent-definition-standards) for what each file must contain.`);
+                  const fileDescriptions = {
+                    'definition.md': 'what the agent does, when to use it, when not to',
+                    'config.example.json': 'a working example configuration with comments',
+                    'test.md': 'how to verify the agent is working correctly',
+                  };
+                  const missingDetails = missing.map(f => `    - \`${dir}/${f}\` — ${fileDescriptions[f]}`).join('\n');
+                  suggestions.push(
+                    `**New agent folder \`${dir}/\` is missing required files**\n` +
+                    `  - Please add these files:\n${missingDetails}\n` +
+                    `  - See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#agent-definition-standards) for templates and details.`
+                  );
                 }
               }
             }
 
             // 6. Warn if lib/ is touched - high blast radius
-            const touchesLib = paths.some(p => p.startsWith('lib/'));
-            if (touchesLib) {
-              warnings.push(`**This PR modifies \`lib/\`** - changes here affect every agent in the system. Make sure a maintainer has signed off on the approach in an issue before this is merged.`);
+            const libFiles = paths.filter(p => p.startsWith('lib/'));
+            if (libFiles.length > 0) {
+              warnings.push(
+                `**This PR modifies shared library files**\n` +
+                `  - Changed: ${libFiles.map(f => `\`${f}\``).join(', ')}\n` +
+                `  - These files affect every agent in the system, so a maintainer needs to sign off.\n` +
+                `  - If you haven't already, open an issue describing the approach before this can be merged.`
+              );
             }
 
             // 7. PR size warning
@@ -96,12 +145,41 @@ jobs:
             const deletions = pr.deletions || 0;
             const totalChanges = additions + deletions;
             if (totalChanges > 500) {
-              warnings.push(`**Large PR (${totalChanges} line changes).** Consider splitting this into smaller, focused PRs if possible. Large PRs are harder to review and more likely to introduce issues.`);
+              warnings.push(
+                `**Large PR (${totalChanges} lines changed: +${additions} / -${deletions})**\n` +
+                `  - PRs over 500 lines are harder to review and more likely to have issues.\n` +
+                `  - Consider splitting into smaller, focused PRs if the changes are independent.`
+              );
             }
 
             // Post comment if there's anything to say
-            if (issues.length === 0 && warnings.length === 0) {
-              // PR looks clean - no comment needed
+            if (suggestions.length === 0 && warnings.length === 0) {
+              // PR looks clean — post a positive note
+              const comments = await github.rest.issues.listComments({
+                owner: repository.owner.login,
+                repo: repository.name,
+                issue_number: pr.number,
+              });
+              const mattCheckComment = comments.data.find(c =>
+                c.user.login === 'github-actions[bot]' &&
+                c.body.includes('<!-- matt-pr-checks -->')
+              );
+              const allClear = `<!-- matt-pr-checks -->\n**Matt the Maintainer — PR Review**\n\nLooks good! No structural issues found. A human reviewer will take it from here.`;
+              if (mattCheckComment) {
+                await github.rest.issues.updateComment({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  comment_id: mattCheckComment.id,
+                  body: allClear,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  issue_number: pr.number,
+                  body: allClear,
+                });
+              }
               return;
             }
 
@@ -116,18 +194,18 @@ jobs:
               c.body.includes('<!-- matt-pr-checks -->')
             );
 
-            let body_text = `<!-- matt-pr-checks -->\n**Matt the Maintainer - PR Review**\n\n`;
+            let body_text = `<!-- matt-pr-checks -->\n**Matt the Maintainer — PR Review**\n\n`;
 
-            if (issues.length > 0) {
-              body_text += `### Issues to fix before merge\n\n`;
-              body_text += issues.map(i => `- ${i}`).join('\n\n') + '\n\n';
+            if (suggestions.length > 0) {
+              body_text += `### Suggestions\n\nThese will help your PR get reviewed and merged faster:\n\n`;
+              body_text += suggestions.map(s => `- ${s}`).join('\n\n') + '\n\n';
             }
             if (warnings.length > 0) {
               body_text += `### Heads up\n\n`;
               body_text += warnings.map(w => `- ${w}`).join('\n\n') + '\n\n';
             }
 
-            body_text += `---\n*Address the issues above, then re-request review. If something looks wrong, leave a comment and a human maintainer will step in.*`;
+            body_text += `---\n*These are automated suggestions, not hard blockers. Address what you can and a human reviewer will take it from there. If something looks wrong, leave a comment.*`;
 
             if (mattCheckComment) {
               await github.rest.issues.updateComment({
@@ -145,7 +223,7 @@ jobs:
               });
             }
 
-            // Fail the check if there are blocking issues
-            if (issues.length > 0) {
-              core.setFailed(`Matt found ${issues.length} issue(s) that must be fixed before merge.`);
+            // Log suggestions as warnings, not failures — these are informational
+            if (suggestions.length > 0) {
+              core.warning(`Matt has ${suggestions.length} suggestion(s) — see the PR comment for details.`);
             }

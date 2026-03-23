@@ -170,6 +170,7 @@ MCPBlueprint/
 │   ├── risk-scanner.md                # How the scanner works
 │   ├── tool-design.md                 # How to design tools agents actually use correctly
 │   ├── auth-patterns.md               # Bearer token, OAuth, and scoped data access
+│   ├── glossary.md                    # Plain-language definitions for beginners
 │   └── production.md                  # Health checks, logging, audit trails, deployment
 │
 ├── lib/                               # Shared agent communication layer
@@ -266,6 +267,12 @@ The scanner checks four categories:
 Output format documented in [risk-scanner/output-schema.md](risk-scanner/output-schema.md).
 
 > **Pre-deploy footnote:** The scanner runs locally, once, before your first Vercel deploy. See [docs/getting-started.md](docs/getting-started.md) for setup instructions.
+
+---
+
+## Glossary
+
+New to agents and MCP? See the [Glossary](docs/glossary.md) for plain-language definitions of every key term used in this project - no prior background required.
 
 ---
 
