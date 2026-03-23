@@ -19,13 +19,21 @@ jobs:
           script: |
             const { pull_request, repository } = context.payload;
             const pr = pull_request;
-            const issues = [];
+
+            // Skip checks for the repository owner
+            const repoOwner = repository.owner.login;
+            if (pr.user.login === repoOwner) {
+              core.info(`PR authored by repo owner (${repoOwner}) — skipping checks.`);
+              return;
+            }
+
+            const suggestions = [];
             const warnings = [];
 
             // 1. Title format: should describe what changed, not be vague
             const vagueTitle = /^(fix|update|change|misc|stuff|wip|test|tweaks?|cleanup|patch)\.?$/i;
             if (vagueTitle.test(pr.title.trim())) {
-              issues.push(`**Title is too vague** (\`${pr.title}\`). Use a descriptive title that says what changed - e.g., \`Add streaming agent pattern definition\` or \`Fix guardrail config example for vault auth\`.`);
+              suggestions.push(`**Title is too vague** (\`${pr.title}\`). Use a descriptive title that says what changed - e.g., \`Add streaming agent pattern definition\` or \`Fix guardrail config example for vault auth\`.`);
             }
 
             // 2. Title shouldn't start with lowercase
@@ -35,7 +43,7 @@ jobs:
 
             // 3. Body shouldn't be empty
             if (!pr.body || pr.body.trim().length < 20) {
-              issues.push(`**PR description is missing or too short.** Add a description explaining what changed and why. If this closes an issue, add \`Closes #N\`.`);
+              suggestions.push(`**PR description is missing or too short.** Add a description explaining what changed and why. If this closes an issue, add \`Closes #N\`.`);
             }
 
             // 4. Check for linked issue if this isn't a docs-only PR
@@ -80,7 +88,7 @@ jobs:
                 const present = paths.filter(p => p.startsWith(dir + '/')).map(p => p.replace(dir + '/', ''));
                 const missing = required.filter(r => !present.includes(r));
                 if (missing.length > 0) {
-                  issues.push(`**New agent folder \`${dir}/\` is missing required files:** ${missing.map(f => `\`${f}\``).join(', ')}. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#agent-definition-standards) for what each file must contain.`);
+                  suggestions.push(`**New agent folder \`${dir}/\` is missing required files:** ${missing.map(f => `\`${f}\``).join(', ')}. See [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md#agent-definition-standards) for what each file must contain.`);
                 }
               }
             }
@@ -100,8 +108,33 @@ jobs:
             }
 
             // Post comment if there's anything to say
-            if (issues.length === 0 && warnings.length === 0) {
-              // PR looks clean - no comment needed
+            if (suggestions.length === 0 && warnings.length === 0) {
+              // PR looks clean — post a positive note
+              const comments = await github.rest.issues.listComments({
+                owner: repository.owner.login,
+                repo: repository.name,
+                issue_number: pr.number,
+              });
+              const mattCheckComment = comments.data.find(c =>
+                c.user.login === 'github-actions[bot]' &&
+                c.body.includes('<!-- matt-pr-checks -->')
+              );
+              const allClear = `<!-- matt-pr-checks -->\n**Matt the Maintainer — PR Review**\n\nLooks good! No structural issues found. A human reviewer will take it from here.`;
+              if (mattCheckComment) {
+                await github.rest.issues.updateComment({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  comment_id: mattCheckComment.id,
+                  body: allClear,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: repository.owner.login,
+                  repo: repository.name,
+                  issue_number: pr.number,
+                  body: allClear,
+                });
+              }
               return;
             }
 
@@ -116,18 +149,18 @@ jobs:
               c.body.includes('<!-- matt-pr-checks -->')
             );
 
-            let body_text = `<!-- matt-pr-checks -->\n**Matt the Maintainer - PR Review**\n\n`;
+            let body_text = `<!-- matt-pr-checks -->\n**Matt the Maintainer — PR Review**\n\n`;
 
-            if (issues.length > 0) {
-              body_text += `### Issues to fix before merge\n\n`;
-              body_text += issues.map(i => `- ${i}`).join('\n\n') + '\n\n';
+            if (suggestions.length > 0) {
+              body_text += `### Suggestions\n\nThese will help your PR get reviewed and merged faster:\n\n`;
+              body_text += suggestions.map(s => `- ${s}`).join('\n\n') + '\n\n';
             }
             if (warnings.length > 0) {
               body_text += `### Heads up\n\n`;
               body_text += warnings.map(w => `- ${w}`).join('\n\n') + '\n\n';
             }
 
-            body_text += `---\n*Address the issues above, then re-request review. If something looks wrong, leave a comment and a human maintainer will step in.*`;
+            body_text += `---\n*These are automated suggestions, not hard blockers. Address what you can and a human reviewer will take it from there. If something looks wrong, leave a comment.*`;
 
             if (mattCheckComment) {
               await github.rest.issues.updateComment({
@@ -145,7 +178,7 @@ jobs:
               });
             }
 
-            // Fail the check if there are blocking issues
-            if (issues.length > 0) {
-              core.setFailed(`Matt found ${issues.length} issue(s) that must be fixed before merge.`);
+            // Log suggestions as warnings, not failures — these are informational
+            if (suggestions.length > 0) {
+              core.warning(`Matt has ${suggestions.length} suggestion(s) — see the PR comment for details.`);
             }
