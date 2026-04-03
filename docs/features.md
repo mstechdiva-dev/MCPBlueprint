@@ -1,5 +1,9 @@
 # MCPBlueprint - Features
 
+A structured, safety-first framework for defining, building, deploying, and managing MCP (Model Context Protocol) agents. MCPBlueprint provides repeatable patterns, built-in safety mechanisms, and standardized communication so teams can move from prototyping agents to production systems with confidence.
+
+**Philosophy:** Agents are the main characters, your data is the backstory. The risk scanner reads that backstory before anything starts. The guardrail watches every character to make sure no one goes off script.
+
 Complete feature list across all layers of the framework.
 
 ---
@@ -139,3 +143,26 @@ Complete feature list across all layers of the framework.
 - Guardrail credential-exposure rule always intervenes (not mode-dependent)
 - Risk scanner findings drive guardrail rules - not hand-written assumptions
 - No secrets in code - all sensitive values in Vercel environment variables
+
+---
+
+## User Workflows
+
+1. **Setup** - Run onboarding wizard to generate platform config based on your needs
+2. **Scan** - Run risk scanner against your codebase to identify exposure areas
+3. **Configure** - Review scanner output, remove false positives, add missed items
+4. **Deploy** - Push to Vercel with environment variables configured
+5. **Monitor** - Use admin panel and guardrail alerts to track agent behavior
+6. **Iterate** - Start in alert mode, validate for 2+ weeks, then move to intervene mode
+
+---
+
+## Differentiators
+
+- **Safety from real findings** - Guardrail rules generated from scanner output, not hand-written assumptions
+- **Markdown as source of truth** - No proprietary formats; anyone can read and edit definitions
+- **Modular and opt-in** - Activate only the agent types you need
+- **You own the code** - Not a hosted service; fork, adapt, and ship under MIT license
+- **No forced integrations** - Documents patterns without locking you into specific services
+- **Production-focused** - Correlation IDs, structured logging, health checks, and audit trails built in
+- **Opinionated where it matters** - Standardized communication and safety; flexible everywhere else
