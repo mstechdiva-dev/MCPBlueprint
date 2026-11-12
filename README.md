@@ -58,7 +58,7 @@ See [docs/agent-communication.md](docs/agent-communication.md) for the full patt
  
 ## What's Included
  
-For the complete feature breakdown see [docs/features.md](docs/features.md).
+For the complete feature breakdown see [features.md](features.md).
  
 ### 9 Agent Types
  
@@ -156,6 +156,7 @@ MCPBlueprint/
 │
 ├── README.md                          # You are here
 ├── CONTRIBUTING.md                    # How to contribute
+├── features.md                        # Complete feature list
 ├── LICENSE                            # MIT
 ├── package.json                       # Node.js project file (npm install)
 ├── vercel.json                        # Vercel deployment config
@@ -163,7 +164,6 @@ MCPBlueprint/
 │
 ├── docs/
 │   ├── overview.md                    # Full system overview
-│   ├── features.md                    # Complete feature list
 │   ├── getting-started.md             # Detailed setup walkthrough
 │   ├── agent-activation.md            # How to activate and manage agents
 │   ├── agent-communication.md         # lib/ layer - correlation, registry, bus

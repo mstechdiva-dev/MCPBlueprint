@@ -76,11 +76,11 @@ MCPBlueprint/
 │
 ├── README.md                          # Project overview and quick start
 ├── CONTRIBUTING.md                    # How to contribute
+├── features.md                        # Complete feature list
 ├── LICENSE                            # MIT
 │
 ├── docs/
 │   ├── overview.md                    # This file
-│   ├── features.md                    # Complete feature list
 │   ├── getting-started.md             # Setup walkthrough
 │   ├── agent-activation.md            # How to activate and deactivate agents
 │   ├── agent-communication.md         # lib/ layer - correlation, registry, bus
